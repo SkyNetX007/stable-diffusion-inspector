@@ -186,7 +186,6 @@ async function readFileInfo(file) {
 
   let ok = []
   const commentJson = JSON.parse(metadata["Comment"]);
-  ok.push({ key: "RAW", value: JSON.stringify(metadata) })
   ok.push({ key: "prompt", value: commentJson.prompt });
   ok.push({ key: "uc", value: commentJson.uc });
   ok.push({ key: "Software", value: metadata["Software"] });
