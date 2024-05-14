@@ -98,6 +98,8 @@ const { toClipboard } = useClipboard();
 
 const availableImgExt = ["png", "jpeg", "jpg", "webp", "bmp"]
 
+const templateMetadata = { Description: "", Software: "NovelAI", Source: "Stable Diffusion XL C1E1DE52", "Generation time": "13.01191060245037", Comment: '{"prompt":"","steps":28,"height":1024,"width":1024,"scale":7,"uncond_scale":1,"cfg_rescale":0,"seed":1327009148,"n_samples":1,"hide_debug_overlay":false,"noise_schedule":"native","legacy_v3_extend":false,"reference_information_extracted_multiple":[],"reference_strength_multiple":[],"sampler":"k_euler_ancestral","controlnet_strength":1,"controlnet_model":null,"dynamic_thresholding":false,"dynamic_thresholding_percentile":0.999,"dynamic_thresholding_mimic_scale":10,"sm":true,"sm_dyn":true,"skip_cfg_below_sigma":0,"lora_unet_weights":null,"lora_clip_weights":null,"uc":"","request_type":"PromptGenerateRequest","signed_hash":"860jyd/93XmJMreXOqM59aYXMICqYxeEm7DfUHTHLZ6yHV1fRRngrKzCAkeKBT4x8CHHRj+aaBzTJb6PDY/Rhr=="}' };
+
 const copy = (value) => {
   try {
     toClipboard(value);
@@ -162,9 +164,11 @@ const inspectImage = async (file) => {
 async function readFileInfo(file) {
   jsonData.value = null
   let parsed = []
+  let metadataType = "None"
 
   let metadata = await getStealthExif(imageRef.value.src)
   if (metadata) {
+    metadataType = "NovelAI"
     parsed = Object.keys(metadata).map((key) => {
       return {
         keyword: key,
@@ -172,17 +176,19 @@ async function readFileInfo(file) {
       }
     });
   } else {
-    return [{
-      key: "提示",
-      value: "无法读取到图像水印，这可能不是一张NAI生成的图，或是经过压缩后丢失了水印的图片。",
-    }];
+    metadataType = "None"
+    ElMessage({
+      message: "没有找到隐匿水印信息，这可能不是一张由NAI生成的图片，或者因压缩和修改而丢失了水印。",
+      type: "warning",
+    });
+    return [{ key: "prompt", value: "" }, { key: "uc", value: "" }, { key: "Software", value: "NovelAI" }, { key: "Source", value: "Stable Diffusion XL C1E1DE52" }]
   }
 
   let ok = []
   const commentJson = JSON.parse(metadata["Comment"]);
+  ok.push({ key: "RAW", value: JSON.stringify(metadata) })
   ok.push({ key: "prompt", value: commentJson.prompt });
   ok.push({ key: "uc", value: commentJson.uc });
-  ok.push({ key: "Title", value: metadata["Title"] });
   ok.push({ key: "Software", value: metadata["Software"] });
   ok.push({ key: "Source", value: metadata["Source"] });
 
@@ -224,7 +230,7 @@ const printableBytes = (size) => {
 
 const saveMetadata = async () => {
   // 重新读取图片中的隐匿水印
-  const existingMetadata = await getStealthExif(imageRef.value.src);
+  let existingMetadata = await getStealthExif(imageRef.value.src);
 
   // 从 imgfileInfoRef 中读取编辑后的数据
   const updatedMetadata = imgfileInfoRef.value.reduce((acc, item) => {
@@ -233,6 +239,14 @@ const saveMetadata = async () => {
   }, {});
 
   // 更新隐匿水印中的信息
+  if (!existingMetadata) {
+    ElMessage({
+      message: "使用模板元信息内容写入图片",
+      type: "info",
+    });
+    existingMetadata = templateMetadata
+  }
+
   if (existingMetadata) {
     // 更新 Comment 字段中的 prompt 和 uc 字段
     if (existingMetadata["Comment"]) {
@@ -245,8 +259,7 @@ const saveMetadata = async () => {
     // 更新水印中的 Description 字段
     existingMetadata["Description"] = updatedMetadata["prompt"];
 
-    // 更新 Title、Software 和 Source 字段
-    existingMetadata["Title"] = updatedMetadata["Title"];
+    // 更新 Software 和 Source 字段
     existingMetadata["Software"] = updatedMetadata["Software"];
     existingMetadata["Source"] = updatedMetadata["Source"];
 
@@ -262,7 +275,7 @@ const saveMetadata = async () => {
     });
   } else {
     ElMessage({
-      message: "无法读取原始水印信息，保存失败。",
+      message: "无法获取水印信息，保存失败。",
       type: "error",
     });
   }
