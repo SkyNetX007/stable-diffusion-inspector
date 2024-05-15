@@ -247,16 +247,37 @@ const saveMetadata = async () => {
   }
 
   if (existingMetadata) {
-    // 更新 Comment 字段中的 prompt 和 uc 字段
+    // 更新 Comment 字段中的 prompt 和 uc
     if (existingMetadata["Comment"]) {
       const commentJson = JSON.parse(existingMetadata["Comment"]);
       commentJson.prompt = updatedMetadata["prompt"];
       commentJson.uc = updatedMetadata["uc"];
+
+      // 生成请求签名
+      const randomBytes = crypto.getRandomValues(new Uint8Array(64));
+      const signature = btoa(String.fromCharCode.apply(null, randomBytes));
+      commentJson.signed_hash = signature;
+
+      // 更改尺寸信息
+      const img = new Image();
+      img.src = imageRef.value.src;
+      await img.decode();
+      commentJson["width"] = img.width;
+      commentJson["height"] = img.height;
+
+      // 更改种子信息
+      const seed = Math.floor(Math.random() * 9000000000) + 1000000000;
+      commentJson["seed"] = seed
+
       existingMetadata["Comment"] = JSON.stringify(commentJson);
     }
 
     // 更新水印中的 Description 字段
     existingMetadata["Description"] = updatedMetadata["prompt"];
+
+    // 更改生成用时
+    const generationTime = (Math.random() * 5 + 10);
+    existingMetadata["Generation time"] = generationTime;
 
     // 更新 Software 和 Source 字段
     existingMetadata["Software"] = updatedMetadata["Software"];
